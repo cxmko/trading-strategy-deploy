@@ -3,7 +3,7 @@ on:
   push:
     paths:
       - 'aws/**'
-      - '.github/workflows/deploy-aws.yml'
+      - '.github/workflows/deploy.yml'
 
 jobs:
   deploy:
