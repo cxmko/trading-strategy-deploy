@@ -12,19 +12,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Conda
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          environment-file: aws/environment.yml
-          activate-environment: aws-trading
-          auto-update-conda: true
-          conda-remove-defaults: true
-          channels: conda-forge
-
-      - name: Install Terraform
-        run: |
-          conda install -n aws-trading terraform=1.7 -c conda-forge -y
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -32,9 +19,24 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push Docker image
+        working-directory: aws
+        run: |
+          REPO_URI=${{ steps.login-ecr.outputs.registry }}/trading-bot
+          docker build -t $REPO_URI:latest .
+          docker push $REPO_URI:latest
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+
       - name: Terraform Init & Apply
         working-directory: aws/infra
-        shell: bash -l {0}  # Critical for conda environment
         run: |
           terraform init
           terraform apply -auto-approve

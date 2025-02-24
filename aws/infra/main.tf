@@ -2,9 +2,16 @@ provider "aws" {
   region = var.aws_region  # Required for Cost Explorer
 }
 
+
+resource "random_id" "bucket_suffix" {
+  byte_length = 4
+}
+
+# Security Group
 resource "aws_security_group" "trading_sg" {
-  name_prefix = "trading-sg-"  # Unique name generation
+  name_prefix = "trading-sg-"
   description = "Allow SSH and trading traffic"
+  vpc_id      = data.aws_vpc.default.id
 
   ingress {
     from_port   = 22
@@ -21,61 +28,17 @@ resource "aws_security_group" "trading_sg" {
   }
 }
 
+data "aws_vpc" "default" {
+  default = true
+}
 
-
-
-# 1. Create CloudWatch Log Group
+# CloudWatch Logs
 resource "aws_cloudwatch_log_group" "trading_logs" {
   name              = "/ec2/trading-bot"
-  retention_in_days = 7  # Keep logs for 1 week
+  retention_in_days = 7
 }
 
-# 2. Add IAM permissions for CloudWatch
-resource "aws_iam_role_policy" "ec2_cloudwatch" {
-  name = "EC2-CloudWatch-Logs"
-  role = aws_iam_role.ec2_role.name
-
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Effect = "Allow",
-      Action = [
-        "logs:CreateLogStream",
-        "logs:PutLogEvents",
-        "logs:DescribeLogGroups"
-      ],
-      Resource = "*"
-    }]
-  })
-}
-
-# 3. Update EC2 instance configuration
-resource "aws_instance" "trading_bot" {
-  ami           = "ami-0d3c032f5934e1b41"
-  instance_type = "t2.micro"
-  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name  # Add this
-  
-  user_data = <<-EOF
-              #!/bin/bash
-              # Install Docker and CloudWatch agent
-              sudo apt-get update
-              sudo apt-get install -y docker.io awscli
-              
-              # Run container with CloudWatch logging
-              docker run -d \
-                --log-driver=awslogs \
-                --log-opt awslogs-region=us-east-1 \
-                --log-opt awslogs-group=/ec2/trading-bot \
-                --log-opt awslogs-stream=my-trading-strategy \
-                your-docker-image
-              EOF
-
-  tags = {
-    Name = "TradingBot"
-  }
-}
-
-# 4. Add IAM role/profile
+# IAM Role
 resource "aws_iam_role" "ec2_role" {
   name = "EC2-CloudWatch-Role"
 
@@ -89,23 +52,78 @@ resource "aws_iam_role" "ec2_role" {
   })
 }
 
+resource "aws_iam_role_policy" "ec2_cloudwatch" {
+  name = "EC2-CloudWatch-Logs"
+  role = aws_iam_role.ec2_role.name
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Action = [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogStreams",
+        "ecr:GetAuthorizationToken",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:GetRepositoryPolicy",
+        "ecr:DescribeRepositories",
+        "ecr:ListImages",
+        "ecr:BatchGetImage"
+      ],
+      Resource = "*"
+    }]
+  })
+}
+
 resource "aws_iam_instance_profile" "ec2_profile" {
   name = "EC2-CloudWatch-Profile"
   role = aws_iam_role.ec2_role.name
 }
 
-
-
-
-resource "random_id" "bucket_suffix" {
-  byte_length = 4
+# ECR Repository
+resource "aws_ecr_repository" "trading_repo" {
+  name = "trading-bot"
 }
 
+# EC2 Instance
+resource "aws_instance" "trading_bot" {
+  ami                  = "ami-0d3c032f5934e1b41" # Ubuntu 22.04
+  instance_type        = "t2.micro"
+  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
+  security_groups      = [aws_security_group.trading_sg.name]
+
+  user_data = <<-EOF
+              #!/bin/bash
+              sudo apt-get update
+              sudo apt-get install -y docker.io
+              
+              # Login to ECR
+              aws ecr get-login-password --region us-east-1 | \
+                docker login --username AWS --password-stdin ${aws_ecr_repository.trading_repo.repository_url}
+              
+              # Pull and run container
+              docker pull ${aws_ecr_repository.trading_repo.repository_url}:latest
+              docker run -d \
+                --log-driver=awslogs \
+                --log-opt awslogs-region=us-east-1 \
+                --log-opt awslogs-group=/ec2/trading-bot \
+                --log-opt awslogs-stream=instance-$(curl -s http://169.254.169.254/latest/meta-data/instance-id) \
+                ${aws_ecr_repository.trading_repo.repository_url}:latest
+              EOF
+
+  tags = {
+    Name = "TradingBot"
+  }
+}
+
+# S3 Bucket
 resource "aws_s3_bucket" "strategy_data" {
   bucket = "cxmko-trading-bot-paris-${formatdate("YYYY-MM", timestamp())}-${random_id.bucket_suffix.hex}"
 }
 
-# Modern security controls (replaces ACLs)
 resource "aws_s3_bucket_ownership_controls" "strategy_data" {
   bucket = aws_s3_bucket.strategy_data.id
   rule {
@@ -113,10 +131,8 @@ resource "aws_s3_bucket_ownership_controls" "strategy_data" {
   }
 }
 
-
 resource "aws_s3_bucket_public_access_block" "strategy_data" {
   bucket = aws_s3_bucket.strategy_data.id
-
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
