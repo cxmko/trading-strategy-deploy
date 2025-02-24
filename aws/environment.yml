@@ -1,6 +1,7 @@
 # aws/environment.yml
 name: aws-trading
 channels:
+  - defaults
   - conda-forge
 dependencies:
   - python=3.9

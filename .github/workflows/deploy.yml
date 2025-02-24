@@ -8,7 +8,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    #environment: production
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -18,16 +17,26 @@ jobs:
         with:
           environment-file: aws/environment.yml
           activate-environment: aws-trading
+          auto-update-conda: true
+          conda-remove-defaults: true  # Critical fix for warning
+          channels: conda-forge  # Explicit channel declaration
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-west-3
+          aws-region: eu-west-3  
 
       - name: Terraform Apply
         working-directory: aws/infra
         run: |
           terraform init
           terraform apply -auto-approve
+
+      - name: Terraform Destroy (Cleanup) # Deleting immediately because this is for demo purposes
+        if: success()  
+        working-directory: aws/infra
+        run: |
+          terraform destroy -auto-approve
+        continue-on-error: true  # Prevent workflow failure if resources are already destroyed
