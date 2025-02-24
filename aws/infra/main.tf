@@ -21,10 +21,7 @@ resource "aws_security_group" "trading_sg" {
   }
 }
 
-resource "aws_iam_role_policy_attachment" "cost_explorer" {
-  role       = aws_iam_role.trading_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSCostExplorerReadOnlyAccess"
-}
+
 
 resource "aws_iam_instance_profile" "trading_profile" {
   name = "trading-instance-profile"
