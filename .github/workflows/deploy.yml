@@ -3,7 +3,7 @@ on:
   push:
     paths:
       - 'aws/**'
-      - '.github/workflows/deploy.yml'
+      - '.github/workflows/deploy-aws.yml'
 
 jobs:
   deploy:
@@ -12,15 +12,29 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          environment-file: aws/environment.yml
+          activate-environment: aws-trading
+          auto-update-conda: true
+          conda-remove-defaults: true
+          channels: conda-forge
+
+      - name: Install Terraform
+        run: |
+          conda install -n aws-trading terraform=1.7 -c conda-forge -y
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-west-3
+          aws-region: us-east-1
 
       - name: Terraform Init & Apply
         working-directory: aws/infra
+        shell: bash -l {0}  # Critical for conda environment
         run: |
           terraform init
           terraform apply -auto-approve
