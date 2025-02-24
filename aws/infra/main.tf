@@ -26,7 +26,7 @@ resource "aws_security_group" "trading_sg" {
 
 
 resource "aws_instance" "trading_bot" {
-  ami                  = "ami-0c55b159cbfafe1f0"  # Ubuntu 22.04 LTS
+  ami                  = "ami-0d3c032f5934e1b41"  # Ubuntu 22.04 LTS
   instance_type        = "t2.micro"
 
 
