@@ -18,25 +18,30 @@ jobs:
           environment-file: aws/environment.yml
           activate-environment: aws-trading
           auto-update-conda: true
-          conda-remove-defaults: true  # Critical fix for warning
-          channels: conda-forge  # Explicit channel declaration
+          conda-remove-defaults: true
+          channels: conda-forge
+
+      - name: Install Terraform explicitly
+        run: |
+          conda install -n aws-trading terraform=1.7 -c conda-forge -y
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-west-3  
+          aws-region: us-east-1  # Must be us-east-1 for Cost Explorer
 
-      - name: Terraform Apply
+      - name: Terraform Init & Apply
         working-directory: aws/infra
+        shell: bash -l {0}  # Activate conda environment
         run: |
           terraform init
           terraform apply -auto-approve
 
-      - name: Terraform Destroy (Cleanup) # Deleting immediately because this is for demo purposes
-        if: success()  
+      - name: Terraform Destroy
+        if: always()  # Run even if previous steps fail
         working-directory: aws/infra
+        shell: bash -l {0}
         run: |
           terraform destroy -auto-approve
-        continue-on-error: true  # Prevent workflow failure if resources are already destroyed
