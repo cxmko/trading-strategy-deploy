@@ -44,6 +44,11 @@ resource "aws_instance" "trading_bot" {
               # Build and run Docker
               docker build -t trading-bot .
               docker run -d trading-bot
+              docker run -d \
+                --log-driver=awslogs \
+                --log-opt awslogs-region=eu-west-3 \
+                --log-opt awslogs-group=/trading/bot \
+                trading-bot
               EOF
 
   tags = {
