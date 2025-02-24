@@ -2,7 +2,6 @@ provider "aws" {
   region = var.aws_region
 }
 
-
 data "aws_ami" "ubuntu" {
   most_recent = true
   owners      = ["099720109477"] # Canonical
@@ -42,11 +41,19 @@ resource "aws_instance" "trading_bot" {
               sudo apt-get update
               sudo apt-get install -y docker.io
               sudo systemctl start docker
+              sudo usermod -aG docker ubuntu
               git clone https://github.com/cxmko/trading-strategy-deploy.git
               cd trading-strategy-deploy/aws
-              docker build -t trading-bot .
-              docker run -d trading-bot
+              sudo docker build -t trading-bot .
+              sudo docker run -d \
+                --log-driver=json-file \
+                --log-opt max-size=10m \
+              trading-bot
               EOF
+}
+
+output "instance_public_ip" {
+  value = aws_instance.trading_bot.public_ip
 }
 
 output "instance_public_ip" {
