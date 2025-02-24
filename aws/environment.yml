@@ -9,3 +9,4 @@ dependencies:
   - pandas=2.2
   - scikit-learn=1.4.0  # Add this line
   - terraform=1.7
+  - docker=6.0
