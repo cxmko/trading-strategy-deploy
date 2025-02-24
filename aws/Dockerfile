@@ -2,25 +2,16 @@ FROM continuumio/miniconda3:latest
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    unzip \
-    && rm -rf /var/lib/apt/lists/*
+# Create logs directory
+RUN mkdir -p /app/logs
 
-# Create Conda environment
+# Install Python dependencies
 COPY environment.yml .
 RUN conda env create -f environment.yml
 
-# Copy application code
+# Copy source files
 COPY src/ ./src/
 
-# Configure logging
-RUN mkdir -p /var/log/trading
-ENV PYTHONUNBUFFERED=1
-
-# Entrypoint script
-COPY entrypoint.sh .
-RUN chmod +x entrypoint.sh
-
-ENTRYPOINT ["./entrypoint.sh"]
+# Run both services
+ENTRYPOINT ["conda", "run", "-n", "aws-trading", "--no-capture-output"]
+CMD ["sh", "-c", "python src/strategy.py & python src/cost_checker.py"]

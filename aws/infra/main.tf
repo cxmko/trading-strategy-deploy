@@ -45,10 +45,7 @@ resource "aws_instance" "trading_bot" {
               git clone https://github.com/cxmko/trading-strategy-deploy.git
               cd trading-strategy-deploy/aws
               sudo docker build -t trading-bot .
-              sudo docker run -d \
-                --log-driver=json-file \
-                --log-opt max-size=10m \
-              trading-bot
+              sudo docker run -d trading-bot tail -f /dev/null
               EOF
 }
 
