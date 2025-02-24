@@ -42,6 +42,7 @@ resource "aws_instance" "trading_bot" {
               # Install Docker
               sudo apt-get update
               sudo apt-get install -y docker.io
+              sudo systemctl start docker
               
               # Clone repository
               git clone https://github.com/cxmko/trading-strategy-deploy.git
