@@ -113,6 +113,7 @@ resource "aws_s3_bucket_ownership_controls" "strategy_data" {
   }
 }
 
+
 resource "aws_s3_bucket_public_access_block" "strategy_data" {
   bucket = aws_s3_bucket.strategy_data.id
 
