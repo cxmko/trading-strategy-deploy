@@ -1,0 +1,10 @@
+# aws/environment.yml
+name: aws-trading
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9
+  - boto3=1.34
+  - pandas=2.2
+  - scikit-learn=1.4.0  # Add this line
+  - terraform=1.7

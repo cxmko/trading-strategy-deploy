@@ -1,0 +1,11 @@
+﻿name: local-dash
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9
+  - streamlit=1.33
+  - pandas=2.2
+  - sqlite=3.42
+  - pip=24.0
+  - pip:
+    - plotly==5.18.0  

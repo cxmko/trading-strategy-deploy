@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+
+# Conda
+.conda/
+envs/
+pkgs/
+*.env.yml.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+.env
+docker-compose.override.yml
+**/db/  # Exclude local databases
+
+# AWS/Oracle
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.backup
+**/.terraform.lock.hcl
+**/override.tf
+**/terraform.tfvars
+
+# Credentials
+*.key
+*.pem
+*.secret
+aws/credentials
+oracle/oci_config
+
+# Logs
+*.log
+logs/
+
