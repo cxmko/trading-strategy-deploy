@@ -23,10 +23,7 @@ resource "aws_security_group" "trading_sg" {
 
 
 
-resource "aws_iam_instance_profile" "trading_profile" {
-  name = "trading-instance-profile"
-  role = aws_iam_role.trading_role.name
-}
+
 
 resource "aws_instance" "trading_bot" {
   ami                  = "ami-0c55b159cbfafe1f0"  # Ubuntu 22.04 LTS
@@ -53,4 +50,27 @@ resource "aws_instance" "trading_bot" {
   tags = {
     Name = "TradingBot"
   }
+
+
+}
+
+resource "aws_s3_bucket" "strategy_data" {
+  bucket = "cxmko-trading-bot-paris-2024"
+}
+
+# Modern security controls (replaces ACLs)
+resource "aws_s3_bucket_ownership_controls" "strategy_data" {
+  bucket = aws_s3_bucket.strategy_data.id
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "strategy_data" {
+  bucket = aws_s3_bucket.strategy_data.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
