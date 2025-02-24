@@ -139,43 +139,7 @@ docker-compose run aws-services python src/cost_checker.py
 └── docker-compose.yml    # Multi-service orchestration
 ```
 
-## Future Roadmap
-1. **Oracle Cloud Integration**
-   - Terraform modules for OCI
-   - Cross-cloud load balancing
-   - Multi-cloud cost comparison
 
-2. **Trading Features**
-   - Backtesting framework
-   - Risk management module
-   - Real-time market data integration
-
-3. **Monitoring & Alerting**
-   - CloudWatch/Prometheus integration
-   - Telegram/Slack trading alerts
-   - Performance analytics dashboard
-
-4. **Security Enhancements**
-   - VPC peering configuration
-   - KMS-based secret management
-   - IAM role hardening
-
-## Troubleshooting
-**Conda Environment Issues**
-```bash
-conda config --set channel_priority strict
-conda clean --all
-```
-
-**Terraform Not Found**
-```bash
-conda install -n aws-trading terraform -c conda-forge
-```
-
-**AWS Cost Explorer Access**
-```bash
-aws ce get-cost-and-usage --time-period Start=2024-01-01,End=2024-01-31 --granularity MONTHLY --metrics "BlendedCost"
-```
 
 ## License
 MIT License - See [LICENSE](LICENSE) for details
