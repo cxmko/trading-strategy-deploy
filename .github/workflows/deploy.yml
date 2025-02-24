@@ -5,7 +5,6 @@ on:
       - 'aws/**'
       - '.github/workflows/deploy.yml'
 
-      
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -20,23 +19,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build, tag, and push Docker image
-        working-directory: aws
-        run: |
-          REPO_URI=${{ steps.login-ecr.outputs.registry }}/trading-bot
-          docker build -t $REPO_URI:latest .
-          docker push $REPO_URI:latest
-
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.7.0
 
-      - name: Terraform Init & Apply
+      - name: Terraform Apply
         working-directory: aws/infra
         run: |
           terraform init
