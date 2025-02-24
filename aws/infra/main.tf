@@ -2,42 +2,19 @@ provider "aws" {
   region = var.aws_region
 }
 
-resource "aws_key_pair" "ssh_key" {
-  key_name   = "trading-key"
-  public_key = file("~/.ssh/aws-key.pub") # Your public key
-}
-resource "aws_instance" "trading_bot" {
-  key_name = aws_key_pair.ssh_key.key_name
-  ami           = "ami-0d3c032f5934e1b41" # Ubuntu 22.04
-  instance_type = "t2.micro"
-  
-  # Allow SSH access
-  vpc_security_group_ids = [aws_security_group.trading_sg.id]
-  
-  # Build and run Docker directly
-  user_data = <<-EOF
-              #!/bin/bash
-              # Install Docker
-              sudo apt-get update
-              sudo apt-get install -y docker.io
-              
-              # Clone repo
-              git clone https://github.com/cxmko/trading-strategy-deploy.git
-              cd trading-strategy-deploy/aws
-              
-              # Build and run container
-              docker build -t trading-bot .
-              docker run -d trading-bot
-              EOF
 
-  tags = {
-    Name = "TradingBot"
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
   }
 }
 
 resource "aws_security_group" "trading_sg" {
   name_prefix = "trading-sg-"
-  description = "Allow SSH and outbound traffic"
+  description = "Allow SSH access"
 
   ingress {
     from_port   = 22
@@ -52,4 +29,26 @@ resource "aws_security_group" "trading_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+}
+
+resource "aws_instance" "trading_bot" {
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = "t2.micro"
+  key_name               = "trading-bot-key"  # Must match AWS Console key name
+  vpc_security_group_ids = [aws_security_group.trading_sg.id]
+
+  user_data = <<-EOF
+              #!/bin/bash
+              sudo apt-get update
+              sudo apt-get install -y docker.io
+              sudo systemctl start docker
+              git clone https://github.com/cxmko/trading-strategy-deploy.git
+              cd trading-strategy-deploy/aws
+              docker build -t trading-bot .
+              docker run -d trading-bot
+              EOF
+}
+
+output "instance_public_ip" {
+  value = aws_instance.trading_bot.public_ip
 }
