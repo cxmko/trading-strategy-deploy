@@ -3,7 +3,7 @@ provider "aws" {
 }
 
 resource "aws_security_group" "trading_sg" {
-  name        = "trading-sg"
+  name_prefix = "trading-sg-"  # Unique name generation
   description = "Allow SSH and trading traffic"
 
   ingress {
@@ -54,7 +54,7 @@ resource "aws_instance" "trading_bot" {
 }
 
 resource "aws_s3_bucket" "strategy_data" {
-  bucket = "cxmko-trading-bot-paris-2024"
+  bucket = "cxmko-trading-bot-paris-${formatdate("YYYY-MM", timestamp())}"
 }
 
 # Modern security controls (replaces ACLs)
