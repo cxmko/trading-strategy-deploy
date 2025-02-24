@@ -5,6 +5,7 @@ on:
       - 'aws/**'
       - '.github/workflows/deploy.yml'
 
+      
 jobs:
   deploy:
     runs-on: ubuntu-latest
