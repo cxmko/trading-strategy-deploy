@@ -56,6 +56,3 @@ output "instance_public_ip" {
   value = aws_instance.trading_bot.public_ip
 }
 
-output "instance_public_ip" {
-  value = aws_instance.trading_bot.public_ip
-}
