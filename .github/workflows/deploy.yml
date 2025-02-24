@@ -30,7 +30,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1  # Must be us-east-1 for Cost Explorer
+          aws-region: eu-west-3  # Must be us-east-1 for Cost Explorer
 
       - name: Terraform Init & Apply
         working-directory: aws/infra
