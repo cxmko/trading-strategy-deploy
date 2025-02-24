@@ -27,7 +27,7 @@ A cloud-agnostic platform for deploying algorithmic trading strategies with auto
 ### Setup
 1. **Clone Repository**
    ```bash
-   git clone https://github.com/yourusername/trading-strategy-deploy.git
+   git clone https://github.com/cxmko/trading-strategy-deploy.git
    cd trading-strategy-deploy
    ```
 
