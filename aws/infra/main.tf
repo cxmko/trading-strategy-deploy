@@ -2,7 +2,12 @@ provider "aws" {
   region = var.aws_region
 }
 
+resource "aws_key_pair" "ssh_key" {
+  key_name   = "trading-key"
+  public_key = file("~/.ssh/aws-key.pub") # Your public key
+}
 resource "aws_instance" "trading_bot" {
+  key_name = aws_key_pair.ssh_key.key_name
   ami           = "ami-0d3c032f5934e1b41" # Ubuntu 22.04
   instance_type = "t2.micro"
   
