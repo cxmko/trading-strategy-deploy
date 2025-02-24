@@ -24,42 +24,85 @@ resource "aws_security_group" "trading_sg" {
 
 
 
+# 1. Create CloudWatch Log Group
+resource "aws_cloudwatch_log_group" "trading_logs" {
+  name              = "/ec2/trading-bot"
+  retention_in_days = 7  # Keep logs for 1 week
+}
 
+# 2. Add IAM permissions for CloudWatch
+resource "aws_iam_role_policy" "ec2_cloudwatch" {
+  name = "EC2-CloudWatch-Logs"
+  role = aws_iam_role.ec2_role.name
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Action = [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogGroups"
+      ],
+      Resource = "*"
+    }]
+  })
+}
+
+# 3. Update EC2 instance configuration
 resource "aws_instance" "trading_bot" {
-  ami                  = "ami-0d3c032f5934e1b41"  # Ubuntu 22.04 LTS
-  instance_type        = "t2.micro"
-
-
+  ami           = "ami-0d3c032f5934e1b41"
+  instance_type = "t2.micro"
+  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name  # Add this
+  
   user_data = <<-EOF
               #!/bin/bash
-              # Install Docker
+              # Install Docker and CloudWatch agent
               sudo apt-get update
-              sudo apt-get install -y docker.io
-              sudo systemctl start docker
+              sudo apt-get install -y docker.io awscli
               
-              # Clone repository
-              git clone https://github.com/cxmko/trading-strategy-deploy.git
-              cd trading-strategy-deploy/aws
-              
-              # Build and run Docker
-              docker build -t trading-bot .
-              docker run -d trading-bot
+              # Run container with CloudWatch logging
               docker run -d \
                 --log-driver=awslogs \
-                --log-opt awslogs-region=eu-west-3 \
-                --log-opt awslogs-group=/trading/bot \
-                trading-bot
+                --log-opt awslogs-region=us-east-1 \
+                --log-opt awslogs-group=/ec2/trading-bot \
+                --log-opt awslogs-stream=my-trading-strategy \
+                your-docker-image
               EOF
 
   tags = {
     Name = "TradingBot"
   }
+}
+
+# 4. Add IAM role/profile
+resource "aws_iam_role" "ec2_role" {
+  name = "EC2-CloudWatch-Role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Principal = { Service = "ec2.amazonaws.com" },
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "EC2-CloudWatch-Profile"
+  role = aws_iam_role.ec2_role.name
+}
 
 
+
+
+resource "random_id" "bucket_suffix" {
+  byte_length = 4
 }
 
 resource "aws_s3_bucket" "strategy_data" {
-  bucket = "cxmko-trading-bot-paris-${formatdate("YYYY-MM", timestamp())}"
+  bucket = "cxmko-trading-bot-paris-${formatdate("YYYY-MM", timestamp())}-${random_id.bucket_suffix.hex}"
 }
 
 # Modern security controls (replaces ACLs)
