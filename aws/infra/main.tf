@@ -28,8 +28,7 @@ resource "aws_security_group" "trading_sg" {
 resource "aws_instance" "trading_bot" {
   ami                  = "ami-0c55b159cbfafe1f0"  # Ubuntu 22.04 LTS
   instance_type        = "t2.micro"
-  iam_instance_profile = aws_iam_instance_profile.trading_profile.name
-  security_groups      = [aws_security_group.trading_sg.name]
+
 
   user_data = <<-EOF
               #!/bin/bash
