@@ -21,6 +21,10 @@ jobs:
           conda-remove-defaults: true
           channels: conda-forge
 
+      - name: Install Terraform
+        run: |
+          conda install -n aws-trading terraform=1.7 -c conda-forge -y
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -30,98 +34,7 @@ jobs:
 
       - name: Terraform Init & Apply
         working-directory: aws/infra
-        shell: bash -l {0}
+        shell: bash -l {0}  # Critical for conda environment
         run: |
           terraform init
           terraform apply -auto-approve
-          
-          # Store outputs for later use
-          LOGS_BUCKET=$(terraform output -raw logs_bucket)
-          EC2_INSTANCE_ID=$(terraform output -raw ec2_instance_id)
-          INSTANCE_IP=$(terraform output -raw instance_ip)
-          
-          echo "LOGS_BUCKET=$LOGS_BUCKET" >> $GITHUB_ENV
-          echo "EC2_INSTANCE_ID=$EC2_INSTANCE_ID" >> $GITHUB_ENV
-          echo "INSTANCE_IP=$INSTANCE_IP" >> $GITHUB_ENV
-          
-      - name: Wait for EC2 instance to complete processing
-        run: |
-          echo "Waiting for EC2 instance $EC2_INSTANCE_ID (IP: $INSTANCE_IP) to start and run the container..."
-          # Wait for the instance to fully initialize (4 minutes)
-          sleep 240
-          
-      - name: Check S3 bucket and download logs
-        shell: bash -l {0}
-        run: |
-          echo "Listing all objects in S3 bucket: $LOGS_BUCKET"
-          aws s3 ls s3://$LOGS_BUCKET/ || echo "Failed to list bucket contents"
-          
-          # Try to get user-data log first for debugging
-          echo "Attempting to download user-data log for debugging..."
-          aws s3 cp s3://$LOGS_BUCKET/user-data.log . || echo "No user-data log found"
-          
-          if [ -f "user-data.log" ]; then
-            echo "==== EC2 INSTANCE SETUP LOG ===="
-            cat user-data.log
-            echo "================================"
-          fi
-          
-          # Try to get the log info file
-          echo "Attempting to download log_info.txt..."
-          aws s3 cp s3://$LOGS_BUCKET/log_info.txt . || echo "No log_info.txt found"
-          
-          # Create logs directory
-          mkdir -p logs
-          
-          # If log_info.txt exists, use it to find the log file
-          if [ -f "log_info.txt" ]; then
-            LOG_FILE=$(grep LOG_FILE log_info.txt | cut -d= -f2)
-            echo "Found log file name: $LOG_FILE"
-            
-            # Download the actual log file
-            aws s3 cp s3://$LOGS_BUCKET/$LOG_FILE logs/ && {
-              echo "==== TRADING BOT LOGS ===="
-              cat logs/$LOG_FILE
-              echo "========================="
-            } || echo "Failed to download $LOG_FILE"
-          else
-            # Try to find any log files directly
-            echo "Searching for log files with prefix trading-output-"
-            LOG_FILES=$(aws s3 ls s3://$LOGS_BUCKET/ | grep "trading-output-" | awk '{print $4}')
-            
-            if [ ! -z "$LOG_FILES" ]; then
-              for LOG_FILE in $LOG_FILES; do
-                echo "Downloading log file: $LOG_FILE"
-                aws s3 cp s3://$LOGS_BUCKET/$LOG_FILE logs/
-              done
-              
-              # Display the latest log file
-              LATEST_LOG=$(ls -t logs/trading-output-* 2>/dev/null | head -1)
-              if [ ! -z "$LATEST_LOG" ]; then
-                echo "==== LATEST TRADING BOT LOG ===="
-                cat $LATEST_LOG
-                echo "==============================="
-              fi
-            else
-              # If no trading logs found, download any available log file
-              echo "No trading log files found, downloading any available log files..."
-              LOG_FILES=$(aws s3 ls s3://$LOGS_BUCKET/ | grep "\.log" | awk '{print $4}')
-              
-              for LOG_FILE in $LOG_FILES; do
-                echo "Downloading log file: $LOG_FILE"
-                aws s3 cp s3://$LOGS_BUCKET/$LOG_FILE logs/
-              done
-              
-              # List downloaded files for debugging
-              echo "Downloaded files:"
-              ls -la logs/
-            fi
-          fi
-          
-      - name: Archive logs
-        uses: actions/upload-artifact@v4
-        with:
-          name: trading-bot-logs
-          path: logs/
-          retention-days: 7
-        continue-on-error: true
