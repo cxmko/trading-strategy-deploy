@@ -12,6 +12,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          environment-file: aws/environment.yml
+          activate-environment: aws-trading
+          auto-update-conda: true
+          conda-remove-defaults: true
+          channels: conda-forge
+
+      - name: Install Terraform
+        run: |
+          conda install -n aws-trading terraform=1.7 -c conda-forge -y
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -19,13 +32,32 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.7.0
-
-      - name: Terraform Apply
+      - name: Terraform Init & Apply
         working-directory: aws/infra
+        shell: bash -l {0}
         run: |
           terraform init
           terraform apply -auto-approve
+          
+      - name: Wait for logs and display them
+        run: |
+          echo "Waiting for EC2 instance to start and run the container..."
+          sleep 120  # Allow time for EC2 to boot and run the container
+          
+          # Get the latest log stream
+          LOG_STREAM=$(aws logs describe-log-streams \
+            --log-group-name /ec2/trading-bot \
+            --order-by LastEventTime \
+            --descending \
+            --limit 1 \
+            --query 'logStreams[0].logStreamName' \
+            --output text)
+            
+          # Display the logs
+          echo "Fetching logs from stream: $LOG_STREAM"
+          aws logs get-log-events \
+            --log-group-name /ec2/trading-bot \
+            --log-stream-name $LOG_STREAM \
+            --limit 100 \
+            --query 'events[*].message' \
+            --output text
