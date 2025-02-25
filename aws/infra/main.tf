@@ -30,13 +30,13 @@ resource "aws_cloudwatch_log_group" "trading_logs" {
 # 2. Add IAM permissions for CloudWatch
 resource "aws_iam_role_policy" "ec2_cloudwatch" {
   name = "EC2-CloudWatch-Logs"
-  role = aws_iam_role.ec2_role.name
+  role = data.aws_iam_role.ec2_role.name
 
   policy = jsonencode({
-    Version = "2012-10-17",
+    Version   = "2012-10-17",
     Statement = [{
-      Effect = "Allow",
-      Action = [
+      Effect   = "Allow",
+      Action   = [
         "logs:CreateLogStream",
         "logs:PutLogEvents",
         "logs:DescribeLogGroups",
@@ -49,57 +49,48 @@ resource "aws_iam_role_policy" "ec2_cloudwatch" {
 
 # 3. Update EC2 instance configuration with direct Docker build
 resource "aws_instance" "trading_bot" {
-  ami                  = "ami-0d3c032f5934e1b41"
-  instance_type        = "t2.micro"
-  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
+  ami                    = "ami-0d3c032f5934e1b41"
+  instance_type          = "t2.micro"
+  iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
   vpc_security_group_ids = [aws_security_group.trading_sg.id]
   
   user_data = <<-EOF
-              #!/bin/bash
-              set -e
+    #!/bin/bash
+    set -e
 
-              # Install Docker and AWS CLI
-              apt-get update
-              apt-get install -y docker.io awscli git
+    # Install Docker and AWS CLI
+    apt-get update
+    apt-get install -y docker.io awscli git
 
-              # Clone your repository
-              git clone https://github.com/cxmko/trading-strategy-deploy.git /app
-              cd /app
+    # Clone your repository
+    git clone https://github.com/cxmko/trading-strategy-deploy.git /app
+    cd /app
 
-              # Build Docker image locally
-              docker build -t trading-bot .
+    # Build Docker image locally
+    docker build -t trading-bot .
 
-              # Run container with CloudWatch logging
-              docker run \
-                --log-driver=awslogs \
-                --log-opt awslogs-region=${var.aws_region} \
-                --log-opt awslogs-group=/ec2/trading-bot \
-                --log-opt awslogs-stream=strategy-output \
-                --log-opt awslogs-create-group=true \
-                trading-bot
-              EOF
+    # Run container with CloudWatch logging
+    docker run \
+      --log-driver=awslogs \
+      --log-opt awslogs-region=${var.aws_region} \
+      --log-opt awslogs-group=/ec2/trading-bot \
+      --log-opt awslogs-stream=strategy-output \
+      --log-opt awslogs-create-group=true \
+      trading-bot
+  EOF
 
   tags = {
     Name = "TradingBot"
   }
 }
 
-# 4. IAM role/profile
-resource "aws_iam_role" "ec2_role" {
-  name = "EC2-CloudWatch-Role"
+# 4. Reference the existing IAM role and create an instance profile
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Effect = "Allow",
-      Principal = { Service = "ec2.amazonaws.com" },
-      Action = "sts:AssumeRole"
-    }]
-  })
+data "aws_iam_role" "ec2_role" {
+  name = "EC2-CloudWatch-Role"
 }
 
 resource "aws_iam_instance_profile" "ec2_profile" {
   name = "EC2-CloudWatch-Profile"
-  role = aws_iam_role.ec2_role.name
+  role = data.aws_iam_role.ec2_role.name
 }
-
