@@ -26,12 +26,7 @@ resource "aws_security_group" "trading_sg" {
   }
 }
 
-# Use data source to reference existing log group
-data "aws_cloudwatch_log_group" "trading_logs" {
-  name = "/ec2/trading-bot"
-}
-
-# Use data source to reference existing IAM role and profile
+# Use data source to reference existing IAM role
 data "aws_iam_role" "ec2_role" {
   name = "EC2-CloudWatch-Role"
 }
@@ -40,9 +35,18 @@ data "aws_iam_instance_profile" "ec2_profile" {
   name = "EC2-CloudWatch-Profile"
 }
 
-# Update IAM policy using the data source
-resource "aws_iam_role_policy" "ec2_cloudwatch" {
-  name = "EC2-CloudWatch-Logs-${formatdate("YYMMDDhhmmss", timestamp())}"
+# Create S3 bucket for logs
+resource "aws_s3_bucket" "trading_logs_bucket" {
+  bucket = "trading-logs-${formatdate("YYMMDDhhmmss", timestamp())}"
+
+  tags = {
+    Name = "Trading Bot Logs"
+  }
+}
+
+# Update IAM policy to allow S3 access
+resource "aws_iam_role_policy" "ec2_s3_access" {
+  name = "EC2-S3-Access-${formatdate("YYMMDDhhmmss", timestamp())}"
   role = data.aws_iam_role.ec2_role.name
 
   policy = jsonencode({
@@ -50,12 +54,14 @@ resource "aws_iam_role_policy" "ec2_cloudwatch" {
     Statement = [{
       Effect = "Allow",
       Action = [
-        "logs:CreateLogStream",
-        "logs:PutLogEvents",
-        "logs:DescribeLogGroups",
-        "logs:DescribeLogStreams"
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:ListBucket"
       ],
-      Resource = "*"
+      Resource = [
+        aws_s3_bucket.trading_logs_bucket.arn,
+        "${aws_s3_bucket.trading_logs_bucket.arn}/*"
+      ]
     }]
   })
 }
@@ -79,23 +85,34 @@ resource "aws_instance" "trading_bot" {
               git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git /app
               cd /app
 
+              # Create logs directory
+              mkdir -p /app/logs
+
               # Build Docker image locally
               docker build -t trading-bot .
 
-              # Create unique log stream name with timestamp
+              # Create unique log filename with timestamp
               TIMESTAMP=$(date +%Y%m%d%H%M%S)
-              LOG_STREAM="trading-output-$TIMESTAMP"
-
-              # Run container with CloudWatch logging
-              docker run \
-                --log-driver=awslogs \
-                --log-opt awslogs-region=${var.aws_region} \
-                --log-opt awslogs-group=/ec2/trading-bot \
-                --log-opt awslogs-stream=$LOG_STREAM \
-                trading-bot
-
-              # Output the log stream name to a file for easy retrieval
-              echo "LOG_STREAM=$LOG_STREAM" > /tmp/log_stream_info.txt
+              LOG_FILE="trading-output-$TIMESTAMP.log"
+              
+              # Run container with output to file
+              docker run --name trading-container -d trading-bot
+              
+              # Give the container some time to run and generate output
+              sleep 60
+              
+              # Get logs from the container
+              docker logs trading-container > /app/logs/$LOG_FILE 2>&1
+              
+              # Upload log file to S3
+              aws s3 cp /app/logs/$LOG_FILE s3://${aws_s3_bucket.trading_logs_bucket.bucket}/$LOG_FILE
+              
+              # Create a metadata file with the log information
+              echo "LOG_BUCKET=${aws_s3_bucket.trading_logs_bucket.bucket}" > /app/logs/log_info.txt
+              echo "LOG_FILE=$LOG_FILE" >> /app/logs/log_info.txt
+              
+              # Upload metadata file to S3 as well
+              aws s3 cp /app/logs/log_info.txt s3://${aws_s3_bucket.trading_logs_bucket.bucket}/log_info.txt
               EOF
 
   tags = {
@@ -103,13 +120,9 @@ resource "aws_instance" "trading_bot" {
   }
 }
 
-
-
-
-
 # Output information to help retrieve logs
-output "log_group_name" {
-  value = data.aws_cloudwatch_log_group.trading_logs.name
+output "logs_bucket" {
+  value = aws_s3_bucket.trading_logs_bucket.bucket
 }
 
 output "ec2_instance_id" {

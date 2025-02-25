@@ -4,9 +4,10 @@
 source /opt/conda/etc/profile.d/conda.sh
 conda activate aws-trading
 
-# Start services with logging
-python src/strategy.py > /proc/1/fd/1 2>&1 &
-python src/cost_checker.py > /proc/1/fd/1 2>&1 &
+echo "Starting trading strategy at $(date)"
+python src/strategy.py
 
-# Keep container alive
-tail -f /dev/null
+echo "Running cost checker at $(date)"
+python src/cost_checker.py
+
+echo "Execution completed at $(date)"

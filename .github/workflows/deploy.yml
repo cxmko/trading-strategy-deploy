@@ -21,10 +21,6 @@ jobs:
           conda-remove-defaults: true
           channels: conda-forge
 
-      - name: Install Terraform
-        run: |
-          conda install -n aws-trading terraform=1.7 -c conda-forge -y
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -39,39 +35,56 @@ jobs:
           terraform init
           terraform apply -auto-approve
           
-          # Store EC2 instance ID for later use
+          # Store outputs for later use
+          LOGS_BUCKET=$(terraform output -raw logs_bucket)
           EC2_INSTANCE_ID=$(terraform output -raw ec2_instance_id)
+          
+          echo "LOGS_BUCKET=$LOGS_BUCKET" >> $GITHUB_ENV
           echo "EC2_INSTANCE_ID=$EC2_INSTANCE_ID" >> $GITHUB_ENV
           
-      - name: Wait for logs and display them
+      - name: Wait for EC2 instance to complete processing
         run: |
           echo "Waiting for EC2 instance $EC2_INSTANCE_ID to start and run the container..."
-          sleep 180  # Allow time for EC2 to boot and run the container
+          # Wait for the instance to fully initialize (3 minutes)
+          sleep 180
           
-          # Find the most recent log stream
-          LOG_STREAMS=$(aws logs describe-log-streams \
-            --log-group-name /ec2/trading-bot \
-            --order-by LastEventTime \
-            --descending \
-            --limit 5 \
-            --query 'logStreams[*].logStreamName' \
-            --output text)
+      - name: Download and display logs
+        shell: bash -l {0}
+        run: |
+          # First, get the log metadata file
+          aws s3 cp s3://$LOGS_BUCKET/log_info.txt .
+          
+          if [ -f "log_info.txt" ]; then
+            # Extract log filename
+            LOG_FILE=$(grep LOG_FILE log_info.txt | cut -d= -f2)
             
-          # Display the logs from the most recent stream
-          for STREAM in $LOG_STREAMS; do
-            echo "Checking log stream: $STREAM"
-            LOG_EVENTS=$(aws logs get-log-events \
-              --log-group-name /ec2/trading-bot \
-              --log-stream-name $STREAM \
-              --limit 100 \
-              --query 'events[*].message' \
-              --output text)
-              
-            if [ ! -z "$LOG_EVENTS" ]; then
-              echo "Found logs in stream: $STREAM"
-              echo "-----------------------------------"
-              echo "$LOG_EVENTS"
-              echo "-----------------------------------"
-              break
-            fi
-          done
+            echo "Downloading log file: $LOG_FILE"
+            # Download the actual log file
+            aws s3 cp s3://$LOGS_BUCKET/$LOG_FILE .
+            
+            # Display logs
+            echo "-----------------------------------"
+            echo "Trading Bot Logs:"
+            echo "-----------------------------------"
+            cat $LOG_FILE
+            echo "-----------------------------------"
+            
+            # Upload logs as an artifact in GitHub Actions
+            mkdir -p logs
+            cp $LOG_FILE logs/
+            
+          else
+            echo "Failed to retrieve log information. EC2 instance might still be initializing."
+            echo "Check S3 bucket manually: $LOGS_BUCKET"
+            
+            # List all objects in the bucket anyway
+            echo "Listing all objects in the S3 bucket:"
+            aws s3 ls s3://$LOGS_BUCKET/
+          fi
+          
+      - name: Archive logs
+        uses: actions/upload-artifact@v3
+        with:
+          name: trading-bot-logs
+          path: logs/
+          retention-days: 7
