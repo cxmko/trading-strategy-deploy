@@ -53,8 +53,12 @@ resource "aws_instance" "trading_bot" {
 
 }
 
+resource "random_id" "bucket_suffix" {
+  byte_length = 4
+}
+
 resource "aws_s3_bucket" "strategy_data" {
-  bucket = "cxmko-trading-bot-paris-${formatdate("YYYY-MM", timestamp())}"
+  bucket = "cxmko-trading-bot-paris-${formatdate("YYYY-MM", timestamp())}-${random_id.bucket_suffix.hex}"
 }
 
 # Modern security controls (replaces ACLs)
