@@ -40,9 +40,10 @@ resource "aws_instance" "trading_bot" {
               
               git clone https://github.com/cxmko/trading-strategy-deploy.git
               cd trading-strategy-deploy/aws
-               
-              docker pull cxmko8/trading-bot:latest
-              docker run -d cxmko8/trading-bot:latest
+              
+              
+              docker build -t trading-bot .
+              docker run -d trading-bot
               EOF
 
   tags = {
