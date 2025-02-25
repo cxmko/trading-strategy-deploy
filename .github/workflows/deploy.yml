@@ -39,25 +39,39 @@ jobs:
           terraform init
           terraform apply -auto-approve
           
+          # Store EC2 instance ID for later use
+          EC2_INSTANCE_ID=$(terraform output -raw ec2_instance_id)
+          echo "EC2_INSTANCE_ID=$EC2_INSTANCE_ID" >> $GITHUB_ENV
+          
       - name: Wait for logs and display them
         run: |
-          echo "Waiting for EC2 instance to start and run the container..."
-          sleep 120  # Allow time for EC2 to boot and run the container
+          echo "Waiting for EC2 instance $EC2_INSTANCE_ID to start and run the container..."
+          sleep 180  # Allow time for EC2 to boot and run the container
           
-          # Get the latest log stream
-          LOG_STREAM=$(aws logs describe-log-streams \
+          # Find the most recent log stream
+          LOG_STREAMS=$(aws logs describe-log-streams \
             --log-group-name /ec2/trading-bot \
             --order-by LastEventTime \
             --descending \
-            --limit 1 \
-            --query 'logStreams[0].logStreamName' \
+            --limit 5 \
+            --query 'logStreams[*].logStreamName' \
             --output text)
             
-          # Display the logs
-          echo "Fetching logs from stream: $LOG_STREAM"
-          aws logs get-log-events \
-            --log-group-name /ec2/trading-bot \
-            --log-stream-name $LOG_STREAM \
-            --limit 100 \
-            --query 'events[*].message' \
-            --output text
+          # Display the logs from the most recent stream
+          for STREAM in $LOG_STREAMS; do
+            echo "Checking log stream: $STREAM"
+            LOG_EVENTS=$(aws logs get-log-events \
+              --log-group-name /ec2/trading-bot \
+              --log-stream-name $STREAM \
+              --limit 100 \
+              --query 'events[*].message' \
+              --output text)
+              
+            if [ ! -z "$LOG_EVENTS" ]; then
+              echo "Found logs in stream: $STREAM"
+              echo "-----------------------------------"
+              echo "$LOG_EVENTS"
+              echo "-----------------------------------"
+              break
+            fi
+          done
