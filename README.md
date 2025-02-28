@@ -9,7 +9,7 @@
 A cloud-agnostic platform for deploying algorithmic trading strategies with automated infrastructure management.
 
 ## Current Features
-- **Multi-Cloud Ready**: AWS infrastructure (with future Oracle Cloud compatibility)
+- **Cloud Implementation**: AWS infrastructure (with future Oracle Cloud compatibility)
 - **Streamlit Dashboard**: Real-time trading visualization
 - **Infrastructure-as-Code**: Terraform-managed cloud resources
 - **Containerized Services**: Docker-based microservices architecture
@@ -139,7 +139,9 @@ docker-compose run aws-services python src/cost_checker.py
 └── docker-compose.yml    # Multi-service orchestration
 ```
 
+## WIP trading dashboard
 
+Planning on implementing trading service using ML and hosting it on Oracle Cloud. The local streamlit app is currently fully functionnal.
 
 ## License
 MIT License - See [LICENSE](LICENSE) for details
@@ -152,13 +154,5 @@ MIT License - See [LICENSE](LICENSE) for details
 
 
 
-**GitHub Actions Integration:**
-The deployment workflow automatically runs cost checks:
-```yaml
-- name: Run Cost Check
-  run: python aws/src/cost_checker.py
-  env:
-    AWS_DEFAULT_REGION: us-east-1
-```
 
 
